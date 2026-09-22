@@ -1,0 +1,72 @@
+name: Build DEFRecolor
+
+on:
+  push:
+    branches: [main, master]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  windows:
+    name: Windows x64
+    runs-on: windows-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out DEFRecolor
+        uses: actions/checkout@v7
+        with:
+          path: DEFRecolor
+
+      - name: Check out DefThumbnailProvider
+        uses: actions/checkout@v7
+        with:
+          repository: GeorgeK1ng/DefThumbnailProvider
+          path: DefThumbnailProvider
+
+      - name: Build DefThumbnailProvider
+        shell: pwsh
+        run: |
+          cmake -S DefThumbnailProvider -B DefThumbnailProvider/build-check-x64 -A x64
+          cmake --build DefThumbnailProvider/build-check-x64 --config Release --parallel
+
+      - name: Build DEFRecolor
+        shell: pwsh
+        run: |
+          $msbuild = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" `
+            -latest -products * -requires Microsoft.Component.MSBuild `
+            -find MSBuild\**\Bin\MSBuild.exe | Select-Object -First 1
+          if (-not $msbuild) { throw "MSBuild was not found." }
+          $output = Join-Path $env:GITHUB_WORKSPACE "package\"
+          $intermediate = Join-Path $env:GITHUB_WORKSPACE "intermediate\"
+          & $msbuild DEFRecolor\DEFRecolor.vcxproj /t:Rebuild `
+            /p:Configuration=Release /p:Platform=x64 `
+            /p:OutDir=$output /p:IntDir=$intermediate `
+            /p:TrackFileAccess=false /p:UseMultiToolTask=false /m:1
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Verify package
+        shell: pwsh
+        run: |
+          $required = @(
+            "package\DEFRecolor.exe",
+            "package\DefThumbnailProvider.dll",
+            "package\languages\english.json"
+          )
+          foreach ($path in $required) {
+            if (-not (Test-Path -LiteralPath $path)) { throw "Missing package file: $path" }
+          }
+          $version = (Get-Item "package\DEFRecolor.exe").VersionInfo
+          if ($version.ProductName -ne "DEFRecolor") { throw "Version metadata is missing." }
+
+      - name: Upload Windows package
+        uses: actions/upload-artifact@v7
+        with:
+          name: DEFRecolor-windows-x64
+          path: package/
+          if-no-files-found: error
+          retention-days: 30

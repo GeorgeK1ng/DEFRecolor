@@ -97,6 +97,8 @@
       <PreprocessorDefinitions>WIN32;_DEBUG;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
+      <LanguageStandard>stdcpp17</LanguageStandard>
+      <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -112,6 +114,8 @@
       <PreprocessorDefinitions>WIN32;NDEBUG;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+      <LanguageStandard>stdcpp17</LanguageStandard>
+      <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -127,6 +131,8 @@
       <PreprocessorDefinitions>_DEBUG;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
+      <LanguageStandard>stdcpp17</LanguageStandard>
+      <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -142,6 +148,8 @@
       <PreprocessorDefinitions>NDEBUG;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+      <LanguageStandard>stdcpp17</LanguageStandard>
+      <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -160,12 +168,29 @@
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="DEFRecolor.rc" />
+    <ResourceCompile Include="Version.rc" />
   </ItemGroup>
   <ItemGroup>
     <Image Include="DEFRecolor.ico" />
     <Image Include="small.ico" />
   </ItemGroup>
+  <ItemGroup>
+    <Content Include="languages\*.json" />
+    <LanguageFiles Include="languages\*.json" />
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
+  <Target Name="CopyDefThumbnailProvider" AfterTargets="Build">
+    <PropertyGroup>
+      <DefThumbnailProviderPath Condition="'$(Platform)'=='x64'">$(SolutionDir)..\DefThumbnailProvider\build-check-x64\Release\DefThumbnailProvider.dll</DefThumbnailProviderPath>
+      <DefThumbnailProviderPath Condition="'$(Platform)'=='Win32'">$(SolutionDir)..\DefThumbnailProvider\build-check-x86\Release\DefThumbnailProvider.dll</DefThumbnailProviderPath>
+    </PropertyGroup>
+    <Copy SourceFiles="$(DefThumbnailProviderPath)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true"
+          Condition="Exists('$(DefThumbnailProviderPath)')" />
+    <Warning Text="DefThumbnailProvider.dll was not found at $(DefThumbnailProviderPath); frame browsing will be unavailable."
+             Condition="!Exists('$(DefThumbnailProviderPath)')" />
+    <MakeDir Directories="$(OutDir)languages" />
+    <Copy SourceFiles="@(LanguageFiles)" DestinationFolder="$(OutDir)languages" SkipUnchangedFiles="true" />
+  </Target>
 </Project>

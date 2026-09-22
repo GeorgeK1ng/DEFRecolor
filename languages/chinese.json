@@ -1,0 +1,13 @@
+{
+  "language.name": "简体中文",
+  "menu.edit": "编辑(&E)", "menu.undo": "撤销(&U)", "menu.redo": "重做(&R)", "status.undo": "已撤销调色板更改。", "status.redo": "已恢复调色板更改。",
+  "menu.file": "文件(&F)", "menu.load": "打开 DEF(&O)...", "menu.save": "保存 DEF(&S)...", "menu.recent": "最近的文件", "menu.recent_empty": "没有最近的文件", "menu.recent_clear": "清除最近记录", "menu.export": "导出调色板(&E)...", "menu.import": "导入调色板(&I)...", "menu.exit": "退出(&X)", "menu.language": "语言(&L)", "menu.help": "帮助(&H)", "menu.guide": "DEFRecolor 使用指南", "menu.about": "关于",
+  "frame": "帧", "group": "组", "selection.hint": "单击选择颜色，Ctrl+单击添加颜色，双击编辑单个颜色。", "selection.count": "已选择颜色：{count}",
+  "hue": "色相", "saturation": "饱和度", "lightness": "亮度", "select_all": "全选", "clear": "清除选择", "reset_selected": "恢复所选颜色", "reset_all": "全部恢复", "reset_sliders": "重置滑块", "preserve": "保留相对明暗",
+  "magic.title": "魔法重着色", "magic.similarity": "相似度", "magic.target": "目标颜色...", "magic.strength": "强度", "magic.apply": "应用重着色", "magic.hint": "选择代表颜色，调整相似度，指定目标颜色，然后应用更改。",
+  "animation.pause": "暂停动画", "animation.play": "播放动画", "animation.speed": "动画速度", "group.frame": "帧与动画", "group.selection": "已选颜色", "group.magic": "魔法重着色", "group.reset": "恢复与重置", "preview.zoom": "缩放", "preview.zoom_reset": "100%",
+  "preview.original": "原始帧", "preview.recolored": "重着色帧", "preview.original_animation": "原始动画", "preview.recolored_animation": "重着色动画",
+  "help.title": "DEFRecolor 使用指南", "help.heading": "调色板重着色流程", "help.body": "打开 DEF，选择动画组和帧，在右侧调色板中选择颜色，并对照原始与重着色预览进行调整。", "help.details": "导航\nCtrl+O 打开 DEF。‘组’选择动画序列，‘帧’选择参考图像。\n\n选择颜色\n单击选择颜色，Ctrl+单击添加或移除颜色。相似度会围绕最后选择的颜色扩展选择。\n\n重着色\n色相、饱和度和亮度会实时更新。魔法重着色将所选颜色与目标颜色混合。\n\n预览\n左侧显示原图，右侧显示结果。缩放只改变图像，局部滚动条用于移动放大的内容。\n\n保存\nCtrl+S 使用建议的文件名保存 DEF。调色板可通过 JSON 导入和导出。", "help.footer": "底部状态栏会确认每个重要操作。",
+  "about.title": "关于 DEFRecolor", "about.heading": "DEFRecolor", "about.body": "Heroes III DEF 调色板编辑器，支持帧和动画的实时对比。", "about.details": "调色板编辑、组与帧导航、HSL 调整、相似颜色选择、魔法重着色、动画预览、缩放以及 JSON 调色板交换。\n\nDEF 解码由 DefThumbnailProvider.dll 提供。", "about.footer": "<a href=\"https://github.com/GeorgeK1ng/DEFRecolor\">GitHub 上的 DEFRecolor</a>",
+  "status.ready": "就绪", "status.loaded": "DEF 文件加载成功。", "status.saved": "DEF 文件保存成功。", "status.exported": "调色板导出成功。", "status.imported": "调色板导入成功。", "status.recent_cleared": "最近文件记录已清除。", "status.group_changed": "动画组已更改。", "status.frame_changed": "所选帧已更改。", "status.animation_playing": "动画已继续播放。", "status.animation_paused": "动画已暂停。", "status.reset_all": "调色板已恢复，选择已清除。"
+}
