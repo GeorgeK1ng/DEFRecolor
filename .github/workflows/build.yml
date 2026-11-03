@@ -18,6 +18,9 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          - arch: x86
+            platform: Win32
+            output: x86
           - arch: x64
             platform: x64
             output: x64
