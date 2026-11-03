@@ -61,9 +61,9 @@ The executable and `DefThumbnailProvider.dll` must use the same architecture. Th
 
 Release packages are provided for:
 
-- **x86** — 32-bit Windows systems.
-- **x64** — standard 64-bit Windows systems.
-- **ARM64** — Windows on ARM devices.
+- **x86** — 32-bit Windows systems, built with MSVC v142 for Windows 7 compatibility.
+- **x64** — standard 64-bit Windows systems, built with MSVC v142 for Windows 7 compatibility.
+- **ARM64** — Windows on ARM devices, built with the current MSVC v143 toolset.
 
 Each package is standalone: the matching provider DLL, languages and required license files are already included. The thumbnail provider does not need to be registered in Windows for DEFRecolor; keeping the DLL beside the executable is sufficient.
 
@@ -174,7 +174,7 @@ git submodule update --init --recursive
 
 Open `DEFRecolor.sln`, select `Release` and either `x64` or `ARM64`, then build the solution. MSBuild configures and builds `external/DefThumbnailProvider` automatically, copies the matching DLL beside DEFRecolor and copies all language packs. The application and provider use the statically linked MSVC runtime, so a separate Visual C++ Redistributable is not required by the release package.
 
-GitHub Actions uses the same solution build and publishes ready-to-run `x86`, `x64` and `ARM64` ZIP artifacts. No separately downloaded provider is needed.
+GitHub Actions uses the same solution build and publishes ready-to-run `x86`, `x64` and `ARM64` ZIP artifacts. Intel builds use the MSVC 14.29/v142 environment; ARM64 uses v143. The bundled provider is compiled with the same architecture and toolset as DEFRecolor, so no separately downloaded provider is needed.
 
 ## DefThumbnailProvider dependency
 

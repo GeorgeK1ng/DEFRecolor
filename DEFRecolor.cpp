@@ -1,6 +1,7 @@
 #include "DEFRecolor.h"
 #include <windows.h>
 #include <windowsx.h>
+#include <strsafe.h>
 #include <commdlg.h>
 #include <commctrl.h>
 #include <shobjidl_core.h>
@@ -253,6 +254,17 @@ namespace
     {
         if (!commonControlsModule)
             commonControlsModule = LoadLibraryExW(L"comctl32.dll", nullptr, LOAD_LIBRARY_SEARCH_SYSTEM32);
+        if (!commonControlsModule)
+        {
+            wchar_t systemDirectory[MAX_PATH]{};
+            const UINT length = GetSystemDirectoryW(systemDirectory, ARRAYSIZE(systemDirectory));
+            if (length && length < ARRAYSIZE(systemDirectory) - 16)
+            {
+                std::wstring systemComCtl(systemDirectory, length);
+                systemComCtl += L"\\comctl32.dll";
+                commonControlsModule = LoadLibraryW(systemComCtl.c_str());
+            }
+        }
         if (!commonControlsModule) return false;
 
         const auto resolve = [](HMODULE module, const char* name, WORD ordinal) -> FARPROC {
@@ -1970,12 +1982,19 @@ Examples:
 
     // GUI mode
     LocalFree(argv);
-    LoadStringW(hInstance, IDS_APP_TITLE, szTitle, MAX_LOADSTRING);
-    LoadStringW(hInstance, IDC_DEFRECOLOR, szWindowClass, MAX_LOADSTRING);
+    if (!LoadStringW(hInstance, IDS_APP_TITLE, szTitle, MAX_LOADSTRING))
+        StringCchCopyW(szTitle, MAX_LOADSTRING, L"DEFRecolor");
+    if (!LoadStringW(hInstance, IDC_DEFRECOLOR, szWindowClass, MAX_LOADSTRING))
+        StringCchCopyW(szWindowClass, MAX_LOADSTRING, L"DEFRecolor.MainWindow");
     MyRegisterClass(hInstance);
 
     if (!InitInstance(hInstance, nCmdShow))
     {
+        const DWORD error = GetLastError();
+        wchar_t message[256]{};
+        StringCchPrintfW(message, ARRAYSIZE(message),
+            L"DEFRecolor could not create its main window. Windows error: %lu.", error);
+        MessageBoxW(nullptr, message, L"DEFRecolor startup error", MB_OK | MB_ICONERROR);
         if (SUCCEEDED(comResult)) CoUninitialize();
         return FALSE;
     }

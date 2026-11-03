@@ -1,0 +1,5 @@
+// Compile the application UI and version metadata into one resource object.
+// This prevents CI linker/toolset combinations from retaining only one of two
+// independent .res files.
+#include "DEFRecolor.rc"
+#include "Version.rc"
