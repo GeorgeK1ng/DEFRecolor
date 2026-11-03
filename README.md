@@ -67,6 +67,21 @@ Release packages are provided for:
 
 Each package is standalone: the matching provider DLL, languages and required license files are already included. The thumbnail provider does not need to be registered in Windows for DEFRecolor; keeping the DLL beside the executable is sufficient.
 
+### Windows Explorer thumbnails
+
+Registration is optional. DEFRecolor loads the adjacent DLL directly for its own previews, while Windows Explorer requires the provider to be registered before it can display DEF thumbnails.
+
+1. Start the matching DEFRecolor build for your Windows architecture.
+2. Choose **Tools → Install thumbnail provider**.
+3. Read the confirmation and approve the Windows administrator prompt.
+4. Reopen Explorer if existing folders do not refresh immediately.
+
+DEFRecolor performs the machine-wide registration directly; it does not create or execute temporary BAT or VBS scripts. The application reports cancellation, a missing DLL and the registration process result. To remove the Explorer integration, choose **Tools → Uninstall thumbnail provider** and approve the administrator prompt. Uninstalling the provider does not remove DEFRecolor or user settings.
+
+The **Tools** menu shows only the action that currently makes sense. DEFRecolor verifies the machine-wide CLSID, registered DLL path and the thumbnail handlers for `.def`, `.d32` and `.p32`. A complete valid registration shows **Uninstall**; a missing, incomplete or stale registration shows **Install**, which also repairs the registration.
+
+Use an x64 package for the normal 64-bit Windows Explorer, x86 for a 32-bit Windows installation and ARM64 for native Windows on ARM. `DEFRecolor.exe` and `DefThumbnailProvider.dll` in one package always have matching architectures.
+
 Recommended release layout:
 
 ```text
@@ -91,6 +106,8 @@ DEFRecolor/
 5. Tune the controls while watching the original and recolored previews.
 6. Press the category's **Apply** button to create one undoable history step.
 7. Save the result. DEFRecolor proposes a filename based on the opened file.
+
+Optional: install Explorer thumbnails at any time from **Tools → Install thumbnail provider**. Administrator permission is required only for installation or uninstallation, not for ordinary editing.
 
 The original palette and previews never change. The edited side always shows the result that will be saved.
 

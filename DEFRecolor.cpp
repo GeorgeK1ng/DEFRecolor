@@ -116,6 +116,7 @@ int rampPreviewMode = 0; // 0 = none, 1 = ramp, 2 = tone
 bool advancedPreviewActive = false;
 std::vector<COLORREF> advancedPreviewBase(256);
 constexpr UINT_PTR AnimationTimerId = 1;
+constexpr UINT_PTR StartupLoadTimerId = 2;
 json translations;
 std::wstring currentLanguage = L"english";
 struct AvailableLanguage
@@ -251,6 +252,9 @@ constexpr size_t PaletteOffset = 16;
 constexpr size_t PaletteSize = 256 * 3;
 constexpr CLSID CLSID_DefThumbnailProvider = {
     0x9b4f3e1c, 0x5d90, 0x4d62, {0x8f, 0xa2, 0x57, 0xd7, 0xb9, 0xa1, 0x3c, 0x84}};
+constexpr wchar_t DefThumbnailProviderClsid[] = L"{9B4F3E1C-5D90-4D62-8FA2-57D7B9A13C84}";
+constexpr wchar_t ThumbnailHandlerGuid[] = L"{e357fccd-a995-4576-b01f-234630154e96}";
+constexpr wchar_t ExtractImageHandlerGuid[] = L"{BB2E617C-0920-11D1-9A0B-00C04FC2D6C1}";
 
 using TaskDialogIndirectFn = HRESULT(WINAPI*)(const TASKDIALOGCONFIG*, int*, int*, BOOL*);
 using InitCommonControlsExFn = BOOL(WINAPI*)(const INITCOMMONCONTROLSEX*);
@@ -609,11 +613,72 @@ std::wstring EscapeMenuText(std::wstring text)
     return text;
 }
 
+bool ReadRegistryString(HKEY root, const std::wstring& path, const wchar_t* valueName, std::wstring& value)
+{
+    HKEY key = nullptr;
+    if (RegOpenKeyExW(root, path.c_str(), 0, KEY_QUERY_VALUE, &key) != ERROR_SUCCESS)
+        return false;
+
+    DWORD type = 0;
+    DWORD byteCount = 0;
+    LONG result = RegQueryValueExW(key, valueName, nullptr, &type, nullptr, &byteCount);
+    if (result != ERROR_SUCCESS || (type != REG_SZ && type != REG_EXPAND_SZ))
+    {
+        RegCloseKey(key);
+        return false;
+    }
+
+    std::vector<wchar_t> buffer(byteCount / sizeof(wchar_t) + 1, L'\0');
+    result = RegQueryValueExW(
+        key, valueName, nullptr, &type, reinterpret_cast<BYTE*>(buffer.data()), &byteCount);
+    RegCloseKey(key);
+    if (result != ERROR_SUCCESS)
+        return false;
+
+    buffer.back() = L'\0';
+    value.assign(buffer.data());
+    return true;
+}
+
+bool RegistryDefaultEquals(HKEY root, const std::wstring& path, const wchar_t* expected)
+{
+    std::wstring value;
+    return ReadRegistryString(root, path, nullptr, value) && _wcsicmp(value.c_str(), expected) == 0;
+}
+
+bool IsThumbnailProviderInstalled()
+{
+    constexpr std::array<const wchar_t*, 3> extensions = {L".def", L".d32", L".p32"};
+    const std::wstring classes = L"Software\\Classes\\";
+    const std::wstring classPath =
+        classes + L"CLSID\\" + DefThumbnailProviderClsid + L"\\InprocServer32";
+    std::wstring registeredModule;
+    if (!ReadRegistryString(HKEY_LOCAL_MACHINE, classPath, nullptr, registeredModule) || registeredModule.empty())
+        return false;
+
+    const DWORD attributes = GetFileAttributesW(registeredModule.c_str());
+    if (attributes == INVALID_FILE_ATTRIBUTES || (attributes & FILE_ATTRIBUTE_DIRECTORY) != 0)
+        return false;
+
+    for (const wchar_t* extension : extensions)
+    {
+        const std::wstring extensionRoot = classes + extension + L"\\shellex\\";
+        const std::wstring systemRoot = classes + L"SystemFileAssociations\\" + extension + L"\\shellex\\";
+        if (!RegistryDefaultEquals(
+                HKEY_LOCAL_MACHINE, extensionRoot + ThumbnailHandlerGuid, DefThumbnailProviderClsid) ||
+            !RegistryDefaultEquals(HKEY_LOCAL_MACHINE, systemRoot + ThumbnailHandlerGuid, DefThumbnailProviderClsid) ||
+            !RegistryDefaultEquals(
+                HKEY_LOCAL_MACHINE, extensionRoot + ExtractImageHandlerGuid, DefThumbnailProviderClsid))
+            return false;
+    }
+    return true;
+}
+
 void BuildApplicationMenu(HWND hWnd)
 {
     DiscoverLanguages();
     HMENU menu = CreateMenu(), file = CreatePopupMenu(), edit = CreatePopupMenu(), select = CreatePopupMenu(),
-          recent = CreatePopupMenu(), language = CreatePopupMenu(), help = CreatePopupMenu();
+          recent = CreatePopupMenu(), tools = CreatePopupMenu(), language = CreatePopupMenu(), help = CreatePopupMenu();
     const auto shortcutLabel = [](const std::wstring& label, const wchar_t* shortcut)
     { return label + L"\t" + shortcut; };
     AppendMenuW(file, MF_STRING, IDM_LOAD_DEF, shortcutLabel(Tr("menu.load"), L"Ctrl+O").c_str());
@@ -655,6 +720,10 @@ void BuildApplicationMenu(HWND hWnd)
     AppendMenuW(select, MF_SEPARATOR, 0, nullptr);
     AppendMenuW(select, selectState, IDM_SELECT_HIGHLIGHTS, Tr("select.highlights").c_str());
     AppendMenuW(select, selectState, IDM_SELECT_SHADOWS, Tr("select.shadows").c_str());
+    if (IsThumbnailProviderInstalled())
+        AppendMenuW(tools, MF_STRING, IDM_PROVIDER_UNINSTALL, Tr("provider.uninstall").c_str());
+    else
+        AppendMenuW(tools, MF_STRING, IDM_PROVIDER_INSTALL, Tr("provider.install").c_str());
     for (size_t index = 0; index < availableLanguages.size(); ++index)
     {
         const auto& item = availableLanguages[index];
@@ -668,6 +737,7 @@ void BuildApplicationMenu(HWND hWnd)
     AppendMenuW(menu, MF_POPUP, reinterpret_cast<UINT_PTR>(file), Tr("menu.file").c_str());
     AppendMenuW(menu, MF_POPUP, reinterpret_cast<UINT_PTR>(edit), Tr("menu.edit").c_str());
     AppendMenuW(menu, MF_POPUP, reinterpret_cast<UINT_PTR>(select), Tr("menu.select").c_str());
+    AppendMenuW(menu, MF_POPUP, reinterpret_cast<UINT_PTR>(tools), Tr("menu.tools").c_str());
     AppendMenuW(menu, MF_POPUP, reinterpret_cast<UINT_PTR>(language), Tr("menu.language").c_str());
     AppendMenuW(menu, MF_POPUP, reinterpret_cast<UINT_PTR>(help), Tr("menu.help").c_str());
     HMENU old = GetMenu(hWnd);
@@ -675,6 +745,107 @@ void BuildApplicationMenu(HWND hWnd)
     if (old)
         DestroyMenu(old);
     DrawMenuBar(hWnd);
+}
+
+bool WaitForElevatedProcess(HWND owner, HANDLE process)
+{
+    EnableWindow(owner, FALSE);
+    for (;;)
+    {
+        const DWORD result = MsgWaitForMultipleObjects(1, &process, FALSE, INFINITE, QS_ALLINPUT);
+        if (result == WAIT_OBJECT_0)
+            break;
+        if (result != WAIT_OBJECT_0 + 1)
+        {
+            EnableWindow(owner, TRUE);
+            return false;
+        }
+
+        MSG message{};
+        while (PeekMessageW(&message, nullptr, 0, 0, PM_REMOVE))
+        {
+            TranslateMessage(&message);
+            DispatchMessageW(&message);
+        }
+    }
+    EnableWindow(owner, TRUE);
+    SetForegroundWindow(owner);
+    return true;
+}
+
+void ManageThumbnailProvider(HWND hWnd, bool install)
+{
+    const auto provider = std::filesystem::path(GetExeDirectory()) / L"DefThumbnailProvider.dll";
+    std::error_code error;
+    if (!std::filesystem::is_regular_file(provider, error))
+    {
+        const std::wstring message = Tr("provider.missing") + L"\n\n" + provider.wstring();
+        MessageBoxW(hWnd, message.c_str(), Tr("provider.title").c_str(), MB_OK | MB_ICONERROR);
+        return;
+    }
+
+    const std::wstring question = Tr(install ? "provider.install_confirm" : "provider.uninstall_confirm");
+    if (MessageBoxW(hWnd,
+                    question.c_str(),
+                    Tr("provider.title").c_str(),
+                    MB_YESNO | MB_ICONINFORMATION | MB_DEFBUTTON2) != IDYES)
+        return;
+
+    wchar_t systemDirectory[MAX_PATH]{};
+    const UINT length = GetSystemDirectoryW(systemDirectory, ARRAYSIZE(systemDirectory));
+    if (!length || length >= ARRAYSIZE(systemDirectory))
+    {
+        MessageBoxW(hWnd, Tr("provider.launch_failed").c_str(), Tr("provider.title").c_str(), MB_OK | MB_ICONERROR);
+        return;
+    }
+
+    const std::filesystem::path regsvr = std::filesystem::path(systemDirectory) / L"regsvr32.exe";
+    std::wstring parameters = install ? L"/s /n /i:machine \"" : L"/s /u /n /i:machine \"";
+    parameters += provider.wstring();
+    parameters += L"\"";
+    const std::wstring workingDirectory = GetExeDirectory();
+
+    SHELLEXECUTEINFOW execute{};
+    execute.cbSize = sizeof(execute);
+    execute.fMask = SEE_MASK_NOCLOSEPROCESS | SEE_MASK_FLAG_NO_UI;
+    execute.hwnd = hWnd;
+    execute.lpVerb = L"runas";
+    execute.lpFile = regsvr.c_str();
+    execute.lpParameters = parameters.c_str();
+    execute.lpDirectory = workingDirectory.c_str();
+    execute.nShow = SW_SHOWNORMAL;
+    if (!ShellExecuteExW(&execute))
+    {
+        const DWORD launchError = GetLastError();
+        if (launchError == ERROR_CANCELLED)
+        {
+            UpdateStatusBar(hWnd, Tr("provider.cancelled").c_str());
+            return;
+        }
+        MessageBoxW(hWnd, Tr("provider.launch_failed").c_str(), Tr("provider.title").c_str(), MB_OK | MB_ICONERROR);
+        return;
+    }
+
+    DWORD exitCode = ERROR_GEN_FAILURE;
+    const bool completed = WaitForElevatedProcess(hWnd, execute.hProcess);
+    if (completed)
+        GetExitCodeProcess(execute.hProcess, &exitCode);
+    CloseHandle(execute.hProcess);
+
+    if (completed && exitCode == ERROR_SUCCESS)
+    {
+        SHChangeNotify(SHCNE_ASSOCCHANGED, SHCNF_IDLIST, nullptr, nullptr);
+        BuildApplicationMenu(hWnd);
+        const std::wstring result = Tr(install ? "provider.installed" : "provider.uninstalled");
+        UpdateStatusBar(hWnd, result.c_str());
+        MessageBoxW(hWnd, result.c_str(), Tr("provider.title").c_str(), MB_OK | MB_ICONINFORMATION);
+    }
+    else
+    {
+        const std::wstring result = Tr("provider.failed") + L" " + std::to_wstring(exitCode) + L".";
+        UpdateStatusBar(hWnd, result.c_str());
+        MessageBoxW(hWnd, result.c_str(), Tr("provider.title").c_str(), MB_OK | MB_ICONERROR);
+    }
 }
 
 struct InformationWindowState
@@ -852,6 +1023,7 @@ void ShowInformationDialog(HWND owner, bool guide)
             {Tr("tab.restore"),
              JoinHelp(
                  {"tooltip.reset_selected", "tooltip.reset_all", "tooltip.reset_sliders", "tooltip.cancel_preview"})},
+            {Tr("provider.title"), JoinHelp({"help.provider", "help.provider_state"})},
             {Tr("menu.edit"),
              L"Ctrl+O  —  " + Tr("menu.load") + L"\r\nCtrl+S  —  " + Tr("menu.save") + L"\r\nCtrl+Z  —  " +
                  Tr("menu.undo") + L"\r\nCtrl+Y  —  " + Tr("menu.redo") + L"\r\nF1  —  " + Tr("menu.guide")}};
@@ -2888,7 +3060,10 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
     UpdateWindow(hWnd);
 
     if (!startupDefFilePath.empty())
-        OpenDEFPath(hWnd, startupDefFilePath);
+    {
+        UpdateStatusBar(hWnd, Tr("status.loading_def").c_str());
+        SetTimer(hWnd, StartupLoadTimerId, 50, nullptr);
+    }
 
     return TRUE;
 }
@@ -4211,6 +4386,16 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         break;
 
     case WM_TIMER:
+        if (wParam == StartupLoadTimerId)
+        {
+            KillTimer(hWnd, StartupLoadTimerId);
+            const std::wstring path = startupDefFilePath;
+            startupDefFilePath.clear();
+            SetCursor(LoadCursorW(nullptr, IDC_WAIT));
+            OpenDEFPath(hWnd, path);
+            SetCursor(LoadCursorW(nullptr, IDC_ARROW));
+            return 0;
+        }
         if (wParam == AnimationTimerId && animationPlaying && frameCount && currentFrame < editorFrames.size())
         {
             const uint32_t group = editorFrames[currentFrame].group;
@@ -4435,6 +4620,12 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             break;
         case IDM_HELP_GUIDE:
             ShowInformationDialog(hWnd, true);
+            break;
+        case IDM_PROVIDER_INSTALL:
+            ManageThumbnailProvider(hWnd, true);
+            break;
+        case IDM_PROVIDER_UNINSTALL:
+            ManageThumbnailProvider(hWnd, false);
             break;
         case IDM_CLEAR_RECENT:
             recentFiles.clear();
@@ -5027,6 +5218,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
     case WM_DESTROY:
     {
         KillTimer(hWnd, AnimationTimerId);
+        KillTimer(hWnd, StartupLoadTimerId);
         ClearPreview();
         if (previewProviderModule)
         {
