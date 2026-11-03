@@ -591,32 +591,171 @@ namespace
         HMENU old = GetMenu(hWnd); SetMenu(hWnd, menu); if (old) DestroyMenu(old); DrawMenuBar(hWnd);
     }
 
-    HRESULT CALLBACK InformationDialogCallback(HWND, UINT notification, WPARAM, LPARAM value, LONG_PTR)
+    struct InformationWindowState
     {
-        if (notification == TDN_HYPERLINK_CLICKED)
-            ShellExecuteW(nullptr, L"open", reinterpret_cast<const wchar_t*>(value), nullptr, nullptr, SW_SHOWNORMAL);
-        return S_OK;
+        bool guide = false;
+        HWND tabs = nullptr;
+        HWND text = nullptr;
+        HWND close = nullptr;
+        HWND github = nullptr;
+        std::vector<std::pair<std::wstring, std::wstring>> pages;
+    };
+
+    std::wstring JoinHelp(std::initializer_list<const char*> keys)
+    {
+        std::wstring result;
+        for (const char* key : keys)
+        {
+            const std::wstring value = Tr(key);
+            if (value.empty() || value == Utf8ToWide(key)) continue;
+            if (!result.empty()) result += L"\r\n\r\n";
+            result += value;
+        }
+        return result;
+    }
+
+    void SelectInformationPage(InformationWindowState* state, int index)
+    {
+        if (!state || !state->text || state->pages.empty()) return;
+        index = (std::max)(0, (std::min)(index, static_cast<int>(state->pages.size() - 1)));
+        SetWindowTextW(state->text, state->pages[index].second.c_str());
+        SendMessageW(state->text, EM_SETSEL, 0, 0);
+        SendMessageW(state->text, EM_SCROLLCARET, 0, 0);
+    }
+
+    LRESULT CALLBACK InformationWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM lParam)
+    {
+        auto* state = reinterpret_cast<InformationWindowState*>(GetWindowLongPtrW(window, GWLP_USERDATA));
+        switch (message)
+        {
+        case WM_CREATE:
+        {
+            state = reinterpret_cast<InformationWindowState*>(
+                reinterpret_cast<CREATESTRUCTW*>(lParam)->lpCreateParams);
+            SetWindowLongPtrW(window, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(state));
+            state->tabs = CreateWindowW(WC_TABCONTROLW, nullptr,
+                WS_CHILD | (state->guide ? WS_VISIBLE : 0) | WS_TABSTOP,
+                0, 0, 0, 0, window, nullptr, hInst, nullptr);
+            state->text = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", nullptr,
+                WS_CHILD | WS_VISIBLE | WS_TABSTOP | ES_LEFT | ES_MULTILINE | ES_READONLY |
+                ES_AUTOVSCROLL | WS_VSCROLL,
+                0, 0, 0, 0, window, nullptr, hInst, nullptr);
+            state->close = CreateWindowW(L"BUTTON", L"OK", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_DEFPUSHBUTTON,
+                0, 0, 0, 0, window, reinterpret_cast<HMENU>(IDOK), hInst, nullptr);
+            if (!state->guide)
+                state->github = CreateWindowW(L"BUTTON", L"GitHub", WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+                    0, 0, 0, 0, window, reinterpret_cast<HMENU>(9002), hInst, nullptr);
+            for (HWND control : { state->tabs, state->text, state->close, state->github })
+                if (control) SendMessageW(control, WM_SETFONT, reinterpret_cast<WPARAM>(uiFont), TRUE);
+            if (state->guide)
+            {
+                for (const auto& page : state->pages)
+                {
+                    TCITEMW item{}; item.mask = TCIF_TEXT;
+                    item.pszText = const_cast<wchar_t*>(page.first.c_str());
+                    TabCtrl_InsertItem(state->tabs, TabCtrl_GetItemCount(state->tabs), &item);
+                }
+                TabCtrl_SetCurSel(state->tabs, 0);
+            }
+            SelectInformationPage(state, 0);
+            return 0;
+        }
+        case WM_SIZE:
+            if (state)
+            {
+                RECT client{}; GetClientRect(window, &client);
+                const int margin = 16, buttonHeight = 34, bottom = client.bottom - margin - buttonHeight;
+                if (state->guide)
+                {
+                    MoveWindow(state->tabs, margin, margin, client.right - margin * 2, 32, TRUE);
+                    MoveWindow(state->text, margin, margin + 40, client.right - margin * 2,
+                        bottom - margin - 40, TRUE);
+                }
+                else
+                    MoveWindow(state->text, margin, margin, client.right - margin * 2, bottom - margin, TRUE);
+                MoveWindow(state->close, client.right - margin - 110, bottom, 110, buttonHeight, TRUE);
+                if (state->github) MoveWindow(state->github, margin, bottom, 130, buttonHeight, TRUE);
+            }
+            return 0;
+        case WM_NOTIFY:
+            if (state && reinterpret_cast<NMHDR*>(lParam)->hwndFrom == state->tabs &&
+                reinterpret_cast<NMHDR*>(lParam)->code == TCN_SELCHANGE)
+                SelectInformationPage(state, TabCtrl_GetCurSel(state->tabs));
+            return 0;
+        case WM_COMMAND:
+            if (LOWORD(wParam) == IDOK) { DestroyWindow(window); return 0; }
+            if (LOWORD(wParam) == 9002)
+            {
+                ShellExecuteW(window, L"open", L"https://github.com/GeorgeK1ng/DEFRecolor",
+                    nullptr, nullptr, SW_SHOWNORMAL);
+                return 0;
+            }
+            break;
+        case WM_CLOSE:
+            DestroyWindow(window); return 0;
+        }
+        return DefWindowProcW(window, message, wParam, lParam);
     }
 
     void ShowInformationDialog(HWND owner, bool guide)
     {
-        const std::wstring title = Tr(guide ? "help.title" : "about.title");
-        const std::wstring heading = Tr(guide ? "help.heading" : "about.heading");
-        const std::wstring content = Tr(guide ? "help.body" : "about.body");
-        const std::wstring details = Tr(guide ? "help.details" : "about.details");
-        const std::wstring footer = Tr(guide ? "help.footer" : "about.footer");
-        const std::wstring completeContent = details.empty() ? content : content + L"\n\n" + details;
-        TASKDIALOGCONFIG config{};
-        config.cbSize = sizeof(config); config.hwndParent = owner; config.hInstance = hInst;
-        config.dwFlags = TDF_ENABLE_HYPERLINKS | TDF_SIZE_TO_CONTENT;
-        config.dwCommonButtons = TDCBF_OK_BUTTON;
-        config.pszWindowTitle = title.c_str(); config.pszMainInstruction = heading.c_str();
-        config.pszContent = completeContent.c_str();
-        config.pszFooter = footer.c_str(); config.pszMainIcon = MAKEINTRESOURCEW(IDI_DEFRECOLOR);
-        config.pfCallback = InformationDialogCallback;
-        LoadCommonControlsApi();
-        if (!taskDialogIndirectFn || FAILED(taskDialogIndirectFn(&config, nullptr, nullptr, nullptr)))
-            MessageBoxW(owner, completeContent.c_str(), title.c_str(), MB_OK | MB_ICONINFORMATION);
+        InformationWindowState state{};
+        state.guide = guide;
+        if (guide)
+        {
+            state.pages = {
+                { Tr("help.heading"), JoinHelp({ "help.body", "help.details", "help.footer" }) },
+                { Tr("tab.selection"), JoinHelp({ "selection.hint", "tooltip.eyedropper", "tooltip.group", "tooltip.frame", "tooltip.similarity" }) },
+                { Tr("tab.corrections"), JoinHelp({ "correction.help", "tooltip.hsl", "tooltip.correction_reset" }) },
+                { Tr("tab.ramp"), JoinHelp({ "ramp.help", "tooltip.ramp_middle", "tooltip.blend_strength", "tooltip.blend_apply" }) },
+                { Tr("tab.magic"), JoinHelp({ "magic.help", "tooltip.target", "tooltip.strength", "tooltip.apply" }) },
+                { Tr("tab.advanced"), JoinHelp({ "advanced.help", "tooltip.advanced_mode", "tooltip.advanced_amount", "tooltip.advanced_levels", "tooltip.advanced_apply" }) },
+                { Tr("tab.restore"), JoinHelp({ "tooltip.reset_selected", "tooltip.reset_all", "tooltip.reset_sliders", "tooltip.cancel_preview" }) },
+                { Tr("menu.edit"), L"Ctrl+O  —  " + Tr("menu.load") + L"\r\nCtrl+S  —  " + Tr("menu.save") +
+                    L"\r\nCtrl+Z  —  " + Tr("menu.undo") + L"\r\nCtrl+Y  —  " + Tr("menu.redo") +
+                    L"\r\nF1  —  " + Tr("menu.guide") }
+            };
+        }
+        else
+            state.pages = { { Tr("about.heading"), JoinHelp({ "about.body", "about.details" }) } };
+
+        static const wchar_t className[] = L"DEFRecolor.InformationWindow";
+        static bool registered = false;
+        if (!registered)
+        {
+            WNDCLASSEXW windowClass{ sizeof(windowClass) };
+            windowClass.lpfnWndProc = InformationWindowProc;
+            windowClass.hInstance = hInst;
+            windowClass.hIcon = LoadIconW(hInst, MAKEINTRESOURCEW(IDI_DEFRECOLOR));
+            windowClass.hIconSm = LoadIconW(hInst, MAKEINTRESOURCEW(IDI_SMALL));
+            windowClass.hCursor = LoadCursorW(nullptr, IDC_ARROW);
+            windowClass.hbrBackground = reinterpret_cast<HBRUSH>(COLOR_WINDOW + 1);
+            windowClass.lpszClassName = className;
+            registered = RegisterClassExW(&windowClass) != 0 || GetLastError() == ERROR_CLASS_ALREADY_EXISTS;
+        }
+        if (!registered) return;
+
+        RECT ownerRect{}; GetWindowRect(owner, &ownerRect);
+        const int width = guide ? 900 : 620, height = guide ? 650 : 440;
+        const int x = ownerRect.left + ((ownerRect.right - ownerRect.left) - width) / 2;
+        const int y = ownerRect.top + ((ownerRect.bottom - ownerRect.top) - height) / 2;
+        HWND window = CreateWindowExW(WS_EX_DLGMODALFRAME, className,
+            Tr(guide ? "help.title" : "about.title").c_str(),
+            WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_THICKFRAME,
+            x, y, width, height, owner, nullptr, hInst, &state);
+        if (!window) return;
+        EnableWindow(owner, FALSE);
+        ShowWindow(window, SW_SHOW); UpdateWindow(window);
+        MSG message{};
+        while (IsWindow(window) && GetMessageW(&message, nullptr, 0, 0) > 0)
+        {
+            if (!IsDialogMessageW(window, &message))
+            {
+                TranslateMessage(&message);
+                DispatchMessageW(&message);
+            }
+        }
+        EnableWindow(owner, TRUE); SetForegroundWindow(owner);
     }
 
     void UpdateSelectionLabel();
