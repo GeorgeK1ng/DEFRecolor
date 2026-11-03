@@ -84,21 +84,20 @@ jobs:
         run: |
           $package = "package/DEFRecolor-${{ matrix.arch }}"
           New-Item -ItemType Directory -Force "$package/languages" | Out-Null
-          New-Item -ItemType Directory -Force "$package/licenses/DefThumbnailProvider" | Out-Null
           Copy-Item "build/release/${{ matrix.output }}/DEFRecolor.exe" $package
           Copy-Item "build/release/${{ matrix.output }}/DefThumbnailProvider.dll" $package
           Copy-Item "languages/*.json" "$package/languages"
-          Copy-Item README.md, LICENSE $package
-          Copy-Item "external/DefThumbnailProvider/LICENSE" "$package/licenses/DefThumbnailProvider"
-          if (Test-Path "external/DefThumbnailProvider/LICENSES") {
-            Copy-Item "external/DefThumbnailProvider/LICENSES" "$package/licenses/DefThumbnailProvider/LICENSES" -Recurse
+          Copy-Item README.md $package
+
+          if ((Test-Path "$package/LICENSE" -PathType Leaf) -or
+              (Test-Path "$package/licenses" -PathType Container)) {
+            throw "Standalone package must not contain a separate LICENSE file or licenses directory."
           }
 
           $requiredFiles = @(
             "$package/DEFRecolor.exe",
             "$package/DefThumbnailProvider.dll",
-            "$package/README.md",
-            "$package/LICENSE"
+            "$package/README.md"
           )
           foreach ($requiredFile in $requiredFiles) {
             if (!(Test-Path -LiteralPath $requiredFile -PathType Leaf)) {

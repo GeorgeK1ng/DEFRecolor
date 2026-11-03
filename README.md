@@ -93,9 +93,10 @@ DEFRecolor/
 │   ├── czech.json
 │   ├── german.json
 │   └── ...
-├── LICENSE
 └── README.md
 ```
+
+Release ZIPs do not contain a separate `LICENSE` file or `licenses` directory.
 
 ## Quick start
 
@@ -197,7 +198,7 @@ GitHub Actions uses the same solution build and publishes ready-to-run `x86`, `x
 
 [DefThumbnailProvider](https://github.com/GeorgeK1ng/DefThumbnailProvider) is included as a pinned git submodule under `external/DefThumbnailProvider`. DEFRecolor loads its editor API directly from the adjacent DLL for decoding, frame metadata and rendering. Keeping it as a submodule provides reproducible builds while allowing the provider to remain an independently maintained project.
 
-When updating the dependency, update the submodule commit deliberately and verify both architecture packages. Provider licensing material is copied into `licenses/DefThumbnailProvider` in every release archive.
+When updating the dependency, update the submodule commit deliberately and verify all architecture packages.
 
 ## Notes for DEF modding
 
@@ -207,7 +208,7 @@ Palette edits affect the complete DEF because the format uses one shared palette
 
 ## License
 
-DEFRecolor is distributed under the terms in [LICENSE](LICENSE).
+DEFRecolor licensing information is maintained in the repository’s [LICENSE](https://github.com/GeorgeK1ng/DEFRecolor/blob/main/LICENSE).
 
 Issues and feature requests are welcome in the [GitHub issue tracker](https://github.com/GeorgeK1ng/DEFRecolor/issues).
 
