@@ -1,4 +1,5 @@
 {
+  "about.github": "Zobrazit na GitHubu",
   "help.provider_state": "Nabídka Nástroje zobrazuje pouze dostupnou akci. Úplná strojová registrace CLSID a všech obslužných klíčů DEF/D32/P32 zobrazí Odinstalovat. Chybějící, neúplné nebo zastaralé záznamy registru zobrazí Nainstalovat, čímž je lze opravit.",
   "help.provider": "DEFRecolor používá DLL vedle aplikace přímo, takže pro samotné úpravy není registrace nutná. Náhledy v Průzkumníku Windows jsou volitelné. Otevři Nástroje > Nainstalovat poskytovatele náhledů, potvrď operaci a schval požadavek Windows na oprávnění správce. Nevytváří se žádný BAT ani VBS skript. Integraci odebereš přes Nástroje > Odinstalovat poskytovatele náhledů. Aplikace oznámí chybějící DLL, zrušené zvýšení oprávnění i výsledek registrace. Použij balíček odpovídající Průzkumníku Windows: x64 pro běžná 64bitová Windows, x86 pro 32bitová Windows a ARM64 pro Windows on ARM.",
   "menu.tools": "&Nástroje",

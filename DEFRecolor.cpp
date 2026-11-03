@@ -851,12 +851,30 @@ void ManageThumbnailProvider(HWND hWnd, bool install)
 struct InformationWindowState
 {
     bool guide = false;
-    HWND tabs = nullptr;
+    int selectedPage = 0;
+    HWND icon = nullptr;
+    HWND title = nullptr;
+    HWND subtitle = nullptr;
+    HWND pageTitle = nullptr;
     HWND text = nullptr;
     HWND close = nullptr;
     HWND github = nullptr;
+    std::vector<HWND> navigationButtons;
     std::vector<std::pair<std::wstring, std::wstring>> pages;
 };
+
+std::wstring NormalizeInformationText(const std::wstring& text)
+{
+    std::wstring normalized;
+    normalized.reserve(text.size() + 32);
+    for (size_t index = 0; index < text.size(); ++index)
+    {
+        if (text[index] == L'\n' && (index == 0 || text[index - 1] != L'\r'))
+            normalized += L'\r';
+        normalized += text[index];
+    }
+    return normalized;
+}
 
 std::wstring JoinHelp(std::initializer_list<const char*> keys)
 {
@@ -868,7 +886,7 @@ std::wstring JoinHelp(std::initializer_list<const char*> keys)
             continue;
         if (!result.empty())
             result += L"\r\n\r\n";
-        result += value;
+        result += NormalizeInformationText(value);
     }
     return result;
 }
@@ -878,9 +896,13 @@ void SelectInformationPage(InformationWindowState* state, int index)
     if (!state || !state->text || state->pages.empty())
         return;
     index = (std::max)(0, (std::min)(index, static_cast<int>(state->pages.size() - 1)));
+    state->selectedPage = index;
+    SetWindowTextW(state->pageTitle, state->pages[index].first.c_str());
     SetWindowTextW(state->text, state->pages[index].second.c_str());
     SendMessageW(state->text, EM_SETSEL, 0, 0);
     SendMessageW(state->text, EM_SCROLLCARET, 0, 0);
+    for (HWND button : state->navigationButtons)
+        InvalidateRect(button, nullptr, TRUE);
 }
 
 LRESULT CALLBACK InformationWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM lParam)
@@ -892,9 +914,9 @@ LRESULT CALLBACK InformationWindowProc(HWND window, UINT message, WPARAM wParam,
     {
         state = reinterpret_cast<InformationWindowState*>(reinterpret_cast<CREATESTRUCTW*>(lParam)->lpCreateParams);
         SetWindowLongPtrW(window, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(state));
-        state->tabs = CreateWindowW(WC_TABCONTROLW,
+        state->icon = CreateWindowW(L"STATIC",
                                     nullptr,
-                                    WS_CHILD | (state->guide ? WS_VISIBLE : 0) | WS_TABSTOP,
+                                    WS_CHILD | WS_VISIBLE | SS_ICON | SS_CENTERIMAGE,
                                     0,
                                     0,
                                     0,
@@ -903,11 +925,51 @@ LRESULT CALLBACK InformationWindowProc(HWND window, UINT message, WPARAM wParam,
                                     nullptr,
                                     hInst,
                                     nullptr);
-        state->text = CreateWindowExW(WS_EX_CLIENTEDGE,
+        const HICON icon = reinterpret_cast<HICON>(LoadImageW(hInst,
+                                                              MAKEINTRESOURCEW(IDI_DEFRECOLOR),
+                                                              IMAGE_ICON,
+                                                              56,
+                                                              56,
+                                                              LR_DEFAULTCOLOR | LR_SHARED));
+        SendMessageW(state->icon, STM_SETIMAGE, IMAGE_ICON, reinterpret_cast<LPARAM>(icon));
+        state->title = CreateWindowW(L"STATIC",
+                                     Tr(state->guide ? "help.title" : "about.heading").c_str(),
+                                     WS_CHILD | WS_VISIBLE | SS_LEFT | SS_ENDELLIPSIS,
+                                     0,
+                                     0,
+                                     0,
+                                     0,
+                                     window,
+                                     nullptr,
+                                     hInst,
+                                     nullptr);
+        state->subtitle = CreateWindowW(L"STATIC",
+                                        Tr(state->guide ? "help.body" : "about.body").c_str(),
+                                        WS_CHILD | WS_VISIBLE | SS_LEFT | SS_ENDELLIPSIS,
+                                        0,
+                                        0,
+                                        0,
+                                        0,
+                                        window,
+                                        nullptr,
+                                        hInst,
+                                        nullptr);
+        state->pageTitle = CreateWindowW(L"STATIC",
+                                         nullptr,
+                                         WS_CHILD | WS_VISIBLE | SS_LEFT | SS_ENDELLIPSIS,
+                                         0,
+                                         0,
+                                         0,
+                                         0,
+                                         window,
+                                         nullptr,
+                                         hInst,
+                                         nullptr);
+        state->text = CreateWindowExW(WS_EX_STATICEDGE,
                                       L"EDIT",
                                       nullptr,
                                       WS_CHILD | WS_VISIBLE | WS_TABSTOP | ES_LEFT | ES_MULTILINE | ES_READONLY |
-                                          ES_AUTOVSCROLL | WS_VSCROLL,
+                                          ES_AUTOVSCROLL | WS_VSCROLL | ES_NOHIDESEL,
                                       0,
                                       0,
                                       0,
@@ -927,10 +989,14 @@ LRESULT CALLBACK InformationWindowProc(HWND window, UINT message, WPARAM wParam,
                                      reinterpret_cast<HMENU>(IDOK),
                                      hInst,
                                      nullptr);
+        SetWindowLongPtrW(state->close,
+                          GWL_STYLE,
+                          GetWindowLongPtrW(state->close, GWL_STYLE) | BS_OWNERDRAW);
         if (!state->guide)
+        {
             state->github = CreateWindowW(L"BUTTON",
-                                          L"GitHub",
-                                          WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+                                          Tr("about.github").c_str(),
+                                          WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_OWNERDRAW,
                                           0,
                                           0,
                                           0,
@@ -939,20 +1005,40 @@ LRESULT CALLBACK InformationWindowProc(HWND window, UINT message, WPARAM wParam,
                                           reinterpret_cast<HMENU>(9002),
                                           hInst,
                                           nullptr);
-        for (HWND control : {state->tabs, state->text, state->close, state->github})
-            if (control)
-                SendMessageW(control, WM_SETFONT, reinterpret_cast<WPARAM>(uiFont), TRUE);
+        }
         if (state->guide)
         {
-            for (const auto& page : state->pages)
+            for (size_t index = 0; index < state->pages.size(); ++index)
             {
-                TCITEMW item{};
-                item.mask = TCIF_TEXT;
-                item.pszText = const_cast<wchar_t*>(page.first.c_str());
-                TabCtrl_InsertItem(state->tabs, TabCtrl_GetItemCount(state->tabs), &item);
+                HWND button = CreateWindowW(L"BUTTON",
+                                             state->pages[index].first.c_str(),
+                                             WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_OWNERDRAW,
+                                             0,
+                                             0,
+                                             0,
+                                             0,
+                                             window,
+                                             reinterpret_cast<HMENU>(9100 + index),
+                                             hInst,
+                                             nullptr);
+                state->navigationButtons.push_back(button);
             }
-            TabCtrl_SetCurSel(state->tabs, 0);
         }
+        for (HWND control : {state->icon,
+                             state->title,
+                             state->subtitle,
+                             state->pageTitle,
+                             state->text,
+                             state->close,
+                             state->github})
+            if (control)
+                SendMessageW(control, WM_SETFONT, reinterpret_cast<WPARAM>(uiFont), TRUE);
+        for (HWND button : state->navigationButtons)
+            SendMessageW(button, WM_SETFONT, reinterpret_cast<WPARAM>(uiFont), TRUE);
+        SendMessageW(state->title, WM_SETFONT, reinterpret_cast<WPARAM>(uiTitleFont), TRUE);
+        SendMessageW(state->pageTitle, WM_SETFONT, reinterpret_cast<WPARAM>(uiBoldFont), TRUE);
+        SendMessageW(state->close, WM_SETFONT, reinterpret_cast<WPARAM>(uiBoldFont), TRUE);
+        SendMessageW(state->text, EM_SETMARGINS, EC_LEFTMARGIN | EC_RIGHTMARGIN, MAKELPARAM(14, 14));
         SelectInformationPage(state, 0);
         return 0;
     }
@@ -961,25 +1047,128 @@ LRESULT CALLBACK InformationWindowProc(HWND window, UINT message, WPARAM wParam,
         {
             RECT client{};
             GetClientRect(window, &client);
-            const int margin = 16, buttonHeight = 34, bottom = client.bottom - margin - buttonHeight;
+            const int margin = 20, buttonHeight = 38, headerHeight = 92;
+            const int bottom = client.bottom - margin - buttonHeight;
+            MoveWindow(state->icon, margin, 18, 56, 56, TRUE);
+            MoveWindow(state->title, 92, 18, client.right - 112, 34, TRUE);
+            MoveWindow(state->subtitle, 92, 54, client.right - 112, 24, TRUE);
             if (state->guide)
             {
-                MoveWindow(state->tabs, margin, margin, client.right - margin * 2, 32, TRUE);
-                MoveWindow(state->text, margin, margin + 40, client.right - margin * 2, bottom - margin - 40, TRUE);
+                const int clientWidth = static_cast<int>(client.right);
+                const int navigationWidth = (std::min)(240, (std::max)(190, clientWidth / 4));
+                int y = headerHeight + 8;
+                for (HWND button : state->navigationButtons)
+                {
+                    MoveWindow(button, margin, y, navigationWidth, 38, TRUE);
+                    y += 44;
+                }
+                const int contentX = margin + navigationWidth + 22;
+                const int contentWidth = client.right - contentX - margin;
+                MoveWindow(state->pageTitle, contentX, headerHeight + 8, contentWidth, 30, TRUE);
+                MoveWindow(state->text,
+                           contentX,
+                           headerHeight + 44,
+                           contentWidth,
+                           (std::max)(80, bottom - headerHeight - 54),
+                           TRUE);
             }
             else
-                MoveWindow(state->text, margin, margin, client.right - margin * 2, bottom - margin, TRUE);
+            {
+                ShowWindow(state->pageTitle, SW_HIDE);
+                MoveWindow(state->text,
+                           margin,
+                           headerHeight,
+                           client.right - margin * 2,
+                           (std::max)(80, bottom - headerHeight - 10),
+                           TRUE);
+            }
             MoveWindow(state->close, client.right - margin - 110, bottom, 110, buttonHeight, TRUE);
             if (state->github)
-                MoveWindow(state->github, margin, bottom, 130, buttonHeight, TRUE);
+                MoveWindow(state->github, margin, bottom, 150, buttonHeight, TRUE);
         }
         return 0;
-    case WM_NOTIFY:
-        if (state && reinterpret_cast<NMHDR*>(lParam)->hwndFrom == state->tabs &&
-            reinterpret_cast<NMHDR*>(lParam)->code == TCN_SELCHANGE)
-            SelectInformationPage(state, TabCtrl_GetCurSel(state->tabs));
+    case WM_CTLCOLORSTATIC:
+    case WM_CTLCOLOREDIT:
+        if (state)
+        {
+            HDC dc = reinterpret_cast<HDC>(wParam);
+            const HWND control = reinterpret_cast<HWND>(lParam);
+            SetTextColor(dc, control == state->subtitle ? UiMuted : UiText);
+            if (control == state->text)
+            {
+                SetBkMode(dc, OPAQUE);
+                SetBkColor(dc, UiCard);
+                return reinterpret_cast<LRESULT>(uiCardBrush);
+            }
+            SetBkMode(dc, TRANSPARENT);
+            return reinterpret_cast<LRESULT>(uiBackgroundBrush);
+        }
         return 0;
+    case WM_DRAWITEM:
+        if (state && reinterpret_cast<DRAWITEMSTRUCT*>(lParam)->CtlType == ODT_BUTTON)
+        {
+            auto* item = reinterpret_cast<DRAWITEMSTRUCT*>(lParam);
+            const int id = static_cast<int>(item->CtlID);
+            const bool navigation = id >= 9100 && id < 9100 + static_cast<int>(state->pages.size());
+            const bool selected = navigation && id - 9100 == state->selectedPage;
+            const bool primary = id == IDOK;
+            const bool pressed = (item->itemState & ODS_SELECTED) != 0;
+            COLORREF fill = primary ? (pressed ? UiAccentHover : UiAccent) : UiCard;
+            COLORREF border = primary ? fill : UiBorder;
+            COLORREF textColor = primary ? RGB(255, 255, 255) : UiText;
+            if (selected)
+            {
+                fill = RGB(239, 246, 255);
+                border = UiAccent;
+                textColor = UiAccent;
+            }
+            else if (!primary && pressed)
+                fill = RGB(241, 245, 249);
+            HBRUSH brush = CreateSolidBrush(fill);
+            HPEN pen = CreatePen(PS_SOLID, 1, border);
+            HGDIOBJ oldBrush = SelectObject(item->hDC, brush);
+            HGDIOBJ oldPen = SelectObject(item->hDC, pen);
+            RoundRect(item->hDC,
+                      item->rcItem.left,
+                      item->rcItem.top,
+                      item->rcItem.right,
+                      item->rcItem.bottom,
+                      8,
+                      8);
+            SelectObject(item->hDC, oldBrush);
+            SelectObject(item->hDC, oldPen);
+            DeleteObject(brush);
+            DeleteObject(pen);
+            wchar_t text[256]{};
+            GetWindowTextW(item->hwndItem, text, ARRAYSIZE(text));
+            SetBkMode(item->hDC, TRANSPARENT);
+            SetTextColor(item->hDC, textColor);
+            const HFONT selectedFont = selected || primary ? uiBoldFont : uiFont;
+            HFONT oldFont = static_cast<HFONT>(SelectObject(item->hDC, selectedFont));
+            RECT textRect = item->rcItem;
+            InflateRect(&textRect, -12, -2);
+            DrawTextW(item->hDC,
+                      text,
+                      -1,
+                      &textRect,
+                      (navigation ? DT_LEFT : DT_CENTER) | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
+            SelectObject(item->hDC, oldFont);
+            if (item->itemState & ODS_FOCUS)
+            {
+                RECT focus = item->rcItem;
+                InflateRect(&focus, -4, -4);
+                DrawFocusRect(item->hDC, &focus);
+            }
+            return TRUE;
+        }
+        break;
     case WM_COMMAND:
+        if (state && LOWORD(wParam) >= 9100 &&
+            LOWORD(wParam) < 9100 + static_cast<int>(state->pages.size()))
+        {
+            SelectInformationPage(state, LOWORD(wParam) - 9100);
+            return 0;
+        }
         if (LOWORD(wParam) == IDOK)
         {
             DestroyWindow(window);
@@ -1006,7 +1195,7 @@ void ShowInformationDialog(HWND owner, bool guide)
     if (guide)
     {
         state.pages = {
-            {Tr("help.heading"), JoinHelp({"help.body", "help.details", "help.footer"})},
+            {Tr("help.heading"), JoinHelp({"help.details", "help.footer"})},
             {Tr("tab.selection"),
              JoinHelp(
                  {"selection.hint", "tooltip.eyedropper", "tooltip.group", "tooltip.frame", "tooltip.similarity"})},
@@ -1029,7 +1218,7 @@ void ShowInformationDialog(HWND owner, bool guide)
                  Tr("menu.undo") + L"\r\nCtrl+Y  —  " + Tr("menu.redo") + L"\r\nF1  —  " + Tr("menu.guide")}};
     }
     else
-        state.pages = {{Tr("about.heading"), JoinHelp({"about.body", "about.details"})}};
+        state.pages = {{Tr("about.heading"), JoinHelp({"about.details"})}};
 
     static const wchar_t className[] = L"DEFRecolor.InformationWindow";
     static bool registered = false;
@@ -1041,7 +1230,7 @@ void ShowInformationDialog(HWND owner, bool guide)
         windowClass.hIcon = LoadIconW(hInst, MAKEINTRESOURCEW(IDI_DEFRECOLOR));
         windowClass.hIconSm = LoadIconW(hInst, MAKEINTRESOURCEW(IDI_SMALL));
         windowClass.hCursor = LoadCursorW(nullptr, IDC_ARROW);
-        windowClass.hbrBackground = reinterpret_cast<HBRUSH>(COLOR_WINDOW + 1);
+        windowClass.hbrBackground = uiBackgroundBrush ? uiBackgroundBrush : GetSysColorBrush(COLOR_WINDOW);
         windowClass.lpszClassName = className;
         registered = RegisterClassExW(&windowClass) != 0 || GetLastError() == ERROR_CLASS_ALREADY_EXISTS;
     }
@@ -1050,9 +1239,22 @@ void ShowInformationDialog(HWND owner, bool guide)
 
     RECT ownerRect{};
     GetWindowRect(owner, &ownerRect);
-    const int width = guide ? 900 : 620, height = guide ? 650 : 440;
-    const int x = ownerRect.left + ((ownerRect.right - ownerRect.left) - width) / 2;
-    const int y = ownerRect.top + ((ownerRect.bottom - ownerRect.top) - height) / 2;
+    RECT workArea{};
+    SystemParametersInfoW(SPI_GETWORKAREA, 0, &workArea, 0);
+    const int requestedWidth = guide ? 1040 : 720;
+    const int requestedHeight = guide ? 720 : 520;
+    const int workWidth = static_cast<int>(workArea.right - workArea.left);
+    const int workHeight = static_cast<int>(workArea.bottom - workArea.top);
+    const int width = (std::min)(requestedWidth, workWidth - 40);
+    const int height = (std::min)(requestedHeight, workHeight - 40);
+    const int centeredX = ownerRect.left + ((ownerRect.right - ownerRect.left) - width) / 2;
+    const int centeredY = ownerRect.top + ((ownerRect.bottom - ownerRect.top) - height) / 2;
+    const int workLeft = static_cast<int>(workArea.left);
+    const int workTop = static_cast<int>(workArea.top);
+    const int workRight = static_cast<int>(workArea.right);
+    const int workBottom = static_cast<int>(workArea.bottom);
+    const int x = (std::max)(workLeft, (std::min)(centeredX, workRight - width));
+    const int y = (std::max)(workTop, (std::min)(centeredY, workBottom - height));
     HWND window = CreateWindowExW(WS_EX_DLGMODALFRAME,
                                   className,
                                   Tr(guide ? "help.title" : "about.title").c_str(),

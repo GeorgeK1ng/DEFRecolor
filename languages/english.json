@@ -1,4 +1,5 @@
 {
+  "about.github": "View on GitHub",
   "help.provider_state": "The Tools menu shows only the available action. A complete machine-wide CLSID and all DEF/D32/P32 handler registrations show Uninstall. Missing, incomplete or stale registry entries show Install, which repairs them.",
   "help.provider": "DEFRecolor uses the DLL beside the application directly, so registration is not required for editing. Windows Explorer thumbnails are optional. Open Tools > Install thumbnail provider, confirm the operation and approve the Windows administrator prompt. No BAT or VBS script is created. Use Tools > Uninstall thumbnail provider to remove Explorer integration. The application reports a missing DLL, cancelled elevation and the registration result. Use the package matching Windows Explorer: x64 for normal 64-bit Windows, x86 for 32-bit Windows and ARM64 for Windows on ARM.",
   "menu.tools": "&Tools",

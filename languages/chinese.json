@@ -1,4 +1,5 @@
 {
+  "about.github": "在 GitHub 上查看",
   "help.provider_state": "“工具”菜单只显示当前可用的操作。完整的计算机级 CLSID 和 DEF/D32/P32 处理程序注册会显示“卸载”；缺失、不完整或过期的注册表项会显示“安装”，并可通过安装进行修复。",
   "help.provider": "DEFRecolor 会直接使用应用程序旁边的 DLL，因此编辑 DEF 无需注册。Windows 资源管理器缩略图是可选功能。请选择“工具 > 安装缩略图提供程序”，确认操作并批准 Windows 管理员权限请求。程序不会创建 BAT 或 VBS 脚本。要删除资源管理器集成，请选择“工具 > 卸载缩略图提供程序”。应用程序会报告 DLL 缺失、权限提升被取消以及注册结果。请选择与系统匹配的软件包：普通 64 位 Windows 使用 x64，32 位 Windows 使用 x86，Windows on ARM 使用 ARM64。",
   "menu.tools": "工具(&T)",

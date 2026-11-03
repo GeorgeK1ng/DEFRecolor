@@ -1,4 +1,5 @@
 {
+  "about.github": "Auf GitHub anzeigen",
   "help.provider_state": "Das Menü Werkzeuge zeigt nur die verfügbare Aktion. Eine vollständige systemweite CLSID- und DEF/D32/P32-Handler-Registrierung zeigt Deinstallieren. Fehlende, unvollständige oder veraltete Registrierungseinträge zeigen Installieren, wodurch sie repariert werden.",
   "help.provider": "DEFRecolor verwendet die DLL neben der Anwendung direkt; zum Bearbeiten ist daher keine Registrierung erforderlich. Miniaturansichten im Windows-Explorer sind optional. Öffnen Sie Werkzeuge > Miniaturansicht-Anbieter installieren, bestätigen Sie den Vorgang und genehmigen Sie die Windows-Abfrage nach Administratorrechten. Es werden keine BAT- oder VBS-Skripte erstellt. Mit Werkzeuge > Miniaturansicht-Anbieter deinstallieren entfernen Sie die Explorer-Integration. Die Anwendung meldet eine fehlende DLL, eine abgebrochene Rechteerhöhung und das Registrierungsergebnis. Verwenden Sie das passende Paket: x64 für normales 64-Bit-Windows, x86 für 32-Bit-Windows und ARM64 für Windows on ARM.",
   "menu.tools": "&Werkzeuge",

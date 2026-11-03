@@ -1,4 +1,5 @@
 {
+  "about.github": "Zobacz w GitHub",
   "help.provider_state": "Menu Narzędzia pokazuje tylko dostępną czynność. Pełna rejestracja CLSID dla całego komputera oraz procedur DEF/D32/P32 pokazuje opcję Odinstaluj. Brakujące, niepełne lub nieaktualne wpisy rejestru pokazują opcję Zainstaluj, która je naprawia.",
   "help.provider": "DEFRecolor korzysta bezpośrednio z biblioteki DLL obok aplikacji, więc rejestracja nie jest potrzebna do edycji. Miniatury w Eksploratorze Windows są opcjonalne. Wybierz Narzędzia > Zainstaluj dostawcę miniatur, potwierdź operację i zaakceptuj żądanie uprawnień administratora. Program nie tworzy skryptów BAT ani VBS. Integrację można usunąć przez Narzędzia > Odinstaluj dostawcę miniatur. Aplikacja zgłasza brak biblioteki DLL, anulowanie podwyższenia uprawnień oraz wynik rejestracji. Użyj właściwego pakietu: x64 dla zwykłego 64-bitowego Windows, x86 dla 32-bitowego Windows i ARM64 dla Windows on ARM.",
   "menu.tools": "&Narzędzia",

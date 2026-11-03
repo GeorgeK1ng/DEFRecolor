@@ -1,4 +1,5 @@
 {
+  "about.github": "Voir sur GitHub",
   "help.provider_state": "Le menu Outils n’affiche que l’action disponible. Une inscription système complète du CLSID et des gestionnaires DEF/D32/P32 affiche Désinstaller. Des entrées absentes, incomplètes ou obsolètes affichent Installer, qui les répare.",
   "help.provider": "DEFRecolor utilise directement la DLL placée à côté de l’application ; son inscription n’est donc pas nécessaire pour l’édition. Les miniatures dans l’Explorateur Windows sont facultatives. Choisissez Outils > Installer le fournisseur de miniatures, confirmez l’opération et acceptez la demande de droits d’administrateur. Aucun script BAT ou VBS n’est créé. Outils > Désinstaller le fournisseur de miniatures supprime l’intégration. L’application signale une DLL absente, l’annulation de l’élévation et le résultat de l’inscription. Utilisez le paquet adapté : x64 pour Windows 64 bits, x86 pour Windows 32 bits et ARM64 pour Windows on ARM.",
   "menu.tools": "&Outils",
