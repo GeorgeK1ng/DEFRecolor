@@ -6,6 +6,10 @@ DEFRecolor combines precise palette editing with live frame and animation previe
 
 ![DEFRecolor workspace](modern-ui.png)
 
+The built-in guide documents the complete recoloring workflow and every editing category directly in the application.
+
+![DEFRecolor built-in guide](help-guide.png)
+
 ## Highlights
 
 - Side-by-side original and recolored palettes.
