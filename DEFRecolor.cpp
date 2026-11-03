@@ -13,6 +13,7 @@
 
 #include <algorithm>
 #include <array>
+#include <climits>
 #include <cmath>
 #include <cstdio>
 #include <cstring>
@@ -1456,13 +1457,16 @@ RECT GetPreviewImageArea(RECT panel)
     return panel;
 }
 
-int HitTestPreviewPaletteIndex(HWND hWnd, POINT point)
+int ColorDistance(COLORREF a, COLORREF b);
+
+std::vector<int> HitTestPreviewPaletteIndices(HWND hWnd, POINT point)
 {
-    if (!defLoaded || !renderFrame || editorFrames.empty())
-        return -1;
+    std::vector<int> matches;
+    if (!defLoaded)
+        return matches;
     const PreviewPanelLayout layout = GetPreviewPanelLayout(hWnd);
     if (!PtInRect(&layout.viewport, point))
-        return -1;
+        return matches;
 
     int panelIndex = -1;
     RECT area{};
@@ -1477,26 +1481,25 @@ int HitTestPreviewPaletteIndex(HWND hWnd, POINT point)
         }
     }
     if (panelIndex < 0)
-        return -1;
-    const uint32_t ordinal = panelIndex < 2 ? currentFrame : animationFrame;
-    std::array<COLORREF, 256> markers{};
-    for (int index = 0; index < 256; ++index)
-        markers[index] = RGB(index, 255 - index, index ^ 0xA5);
-    HBITMAP bitmap = nullptr;
-    if (FAILED(renderFrame(buffer.data(), buffer.size(), ordinal, markers.data(), 512, &bitmap)) || !bitmap)
-        return -1;
-    DIBSECTION dib{};
-    if (GetObjectW(bitmap, sizeof(dib), &dib) != sizeof(dib) || !dib.dsBm.bmBits)
-    {
-        DeleteObject(bitmap);
-        return -1;
-    }
+        return matches;
+
+    const std::array<HBITMAP, 4> images = {
+        originalPreviewBitmap, previewBitmap, originalAnimationBitmap, recoloredAnimationBitmap};
+    const HBITMAP bitmap = images[panelIndex];
+    if (!bitmap)
+        return matches;
+    BITMAP bitmapInfo{};
+    if (GetObjectW(bitmap, sizeof(bitmapInfo), &bitmapInfo) != sizeof(bitmapInfo) || bitmapInfo.bmWidth <= 0 ||
+        bitmapInfo.bmHeight == 0)
+        return matches;
+
     const int areaWidth = area.right - area.left, areaHeight = area.bottom - area.top;
-    const double fit = min(static_cast<double>(areaWidth) / dib.dsBm.bmWidth,
-                           static_cast<double>(areaHeight) / abs(dib.dsBm.bmHeight));
+    const int bitmapHeight = abs(bitmapInfo.bmHeight);
+    const double fit =
+        min(static_cast<double>(areaWidth) / bitmapInfo.bmWidth, static_cast<double>(areaHeight) / bitmapHeight);
     const double scale = fit * previewZoomPercent / 100.0;
-    const int drawnWidth = max(1, static_cast<int>(dib.dsBm.bmWidth * scale));
-    const int drawnHeight = max(1, static_cast<int>(abs(dib.dsBm.bmHeight) * scale));
+    const int drawnWidth = max(1, static_cast<int>(bitmapInfo.bmWidth * scale));
+    const int drawnHeight = max(1, static_cast<int>(bitmapHeight * scale));
     SCROLLINFO horizontal{sizeof(horizontal), SIF_RANGE | SIF_PAGE};
     SCROLLINFO vertical{sizeof(vertical), SIF_RANGE | SIF_PAGE};
     GetScrollInfo(previewHorizontalScroll, SB_CTL, &horizontal);
@@ -1511,19 +1514,37 @@ int HitTestPreviewPaletteIndex(HWND hWnd, POINT point)
         overflowY ? area.top - static_cast<int>(overflowY * (maxY ? static_cast<double>(previewScrollY) / maxY : 0.5))
                   : area.top + (areaHeight - drawnHeight) / 2;
     if (point.x < drawX || point.y < drawY || point.x >= drawX + drawnWidth || point.y >= drawY + drawnHeight)
+        return matches;
+
+    const int sourceX = min(bitmapInfo.bmWidth - 1, max(0, static_cast<int>((point.x - drawX) / scale)));
+    const int sourceY = min(bitmapHeight - 1, max(0, static_cast<int>((point.y - drawY) / scale)));
+    HDC bitmapDc = CreateCompatibleDC(nullptr);
+    if (!bitmapDc)
+        return matches;
+    HGDIOBJ previousBitmap = SelectObject(bitmapDc, bitmap);
+    const COLORREF sampled = GetPixel(bitmapDc, sourceX, sourceY);
+    SelectObject(bitmapDc, previousBitmap);
+    DeleteDC(bitmapDc);
+    if (sampled == CLR_INVALID)
+        return matches;
+    const std::vector<COLORREF>& palette = (panelIndex == 0 || panelIndex == 2) ? inputPalette : previewPalette;
+
+    int nearestIndex = -1;
+    int nearestDistance = INT_MAX;
+    for (int index = 0; index < static_cast<int>(palette.size()); ++index)
     {
-        DeleteObject(bitmap);
-        return -1;
+        const int distance = ColorDistance(sampled, palette[index]);
+        if (distance == 0)
+            matches.push_back(index);
+        if (distance < nearestDistance)
+        {
+            nearestDistance = distance;
+            nearestIndex = index;
+        }
     }
-    const int sourceX = min(dib.dsBm.bmWidth - 1, max(0, static_cast<int>((point.x - drawX) / scale)));
-    const int logicalY = min(abs(dib.dsBm.bmHeight) - 1, max(0, static_cast<int>((point.y - drawY) / scale)));
-    const int sourceY = dib.dsBm.bmHeight > 0 ? abs(dib.dsBm.bmHeight) - 1 - logicalY : logicalY;
-    const auto* pixel = static_cast<const uint8_t*>(dib.dsBm.bmBits) +
-                        static_cast<size_t>(sourceY) * dib.dsBm.bmWidthBytes + sourceX * 4;
-    const int index = pixel[2];
-    const bool marker = pixel[1] == 255 - index && pixel[0] == (index ^ 0xA5);
-    DeleteObject(bitmap);
-    return marker ? index : -1;
+    if (matches.empty() && nearestIndex >= 0)
+        matches.push_back(nearestIndex);
+    return matches;
 }
 
 void ScrollPreview(HWND hWnd, int bar, UINT request, int thumb)
@@ -3926,22 +3947,38 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
                 return 0;
             }
         }
-        const int previewIndex = eyedropperEnabled ? HitTestPreviewPaletteIndex(hWnd, pt) : -1;
-        if (previewIndex >= 0)
+        const std::vector<int> previewIndices =
+            eyedropperEnabled ? HitTestPreviewPaletteIndices(hWnd, pt) : std::vector<int>{};
+        if (!previewIndices.empty())
         {
-            if (IsPaletteIndexProtected(previewIndex))
-                UpdateStatusBar(hWnd, Tr("status.special_protected").c_str());
-            else
+            if (!(GetKeyState(VK_CONTROL) & 0x8000))
+                std::fill(std::begin(selectedPaletteColors), std::end(selectedPaletteColors), false);
+            int firstEditable = -1;
+            for (const int previewIndex : previewIndices)
             {
-                if (!(GetKeyState(VK_CONTROL) & 0x8000))
-                    std::fill(std::begin(selectedPaletteColors), std::end(selectedPaletteColors), false);
-                selectedPaletteColors[previewIndex] = true;
-                lastSelectedColor = previewIndex;
+                if (!IsPaletteIndexProtected(previewIndex))
+                {
+                    selectedPaletteColors[previewIndex] = true;
+                    if (firstEditable < 0)
+                        firstEditable = previewIndex;
+                }
+            }
+            if (firstEditable >= 0)
+            {
+                lastSelectedColor = firstEditable;
                 ResetAdjustmentSliders();
                 UpdateSelectionLabel();
                 InvalidateRect(hWnd, nullptr, FALSE);
                 UpdateStatusBar(hWnd, Tr("status.eyedropper_selected").c_str());
             }
+            else
+                UpdateStatusBar(hWnd, Tr("status.special_protected").c_str());
+            return 0;
+        }
+        const PreviewPanelLayout previewLayout = GetPreviewPanelLayout(hWnd);
+        if (eyedropperEnabled && PtInRect(&previewLayout.viewport, pt))
+        {
+            UpdateStatusBar(hWnd, Tr("tooltip.eyedropper").c_str());
             return 0;
         }
     }

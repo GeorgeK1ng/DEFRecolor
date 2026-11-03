@@ -99,6 +99,32 @@ jobs:
             Copy-Item "external/DefThumbnailProvider/LICENSES" "$package/licenses/DefThumbnailProvider/LICENSES" -Recurse
           }
 
+          $requiredFiles = @(
+            "$package/DEFRecolor.exe",
+            "$package/DefThumbnailProvider.dll",
+            "$package/README.md",
+            "$package/LICENSE"
+          )
+          foreach ($requiredFile in $requiredFiles) {
+            if (!(Test-Path -LiteralPath $requiredFile -PathType Leaf)) {
+              throw "Release package is incomplete: $requiredFile is missing."
+            }
+          }
+
+          $sourceLanguages = @(Get-ChildItem "languages" -Filter "*.json" -File)
+          $packagedLanguages = @(Get-ChildItem "$package/languages" -Filter "*.json" -File)
+          if ($sourceLanguages.Count -eq 0 -or $packagedLanguages.Count -ne $sourceLanguages.Count) {
+            throw "Release package contains $($packagedLanguages.Count) of $($sourceLanguages.Count) language files."
+          }
+          foreach ($language in $packagedLanguages) {
+            try {
+              Get-Content -LiteralPath $language.FullName -Raw | ConvertFrom-Json | Out-Null
+            }
+            catch {
+              throw "Invalid language file in release package: $($language.Name). $($_.Exception.Message)"
+            }
+          }
+
       - name: Upload standalone package
         uses: actions/upload-artifact@v4
         with:
