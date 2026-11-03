@@ -1,75 +1,196 @@
 # DEFRecolor
 
-DEFRecolor is a Windows tool designed for editing palette-based DEF files used in **Heroes of Might and Magic 3**. It provides an easy way to load, modify, and save DEF files with simple graphical interface.
+Professional palette editor for Heroes of Might and Magic III DEF graphics.
 
-This tool is specifically tailored for Heroes of Might and Magic 3 modding needs, making palette management for DEF files simple and efficient.
+DEFRecolor combines precise palette editing with live frame and animation previews. It is designed for modders who want to recolor creatures, heroes, adventure-map objects and interface assets without repeatedly exporting frames to another graphics editor.
 
-## Features
+![DEFRecolor workspace](modern-ui.png)
 
-- Load and visualize DEF palettes from Heroes 3.
-- Modify individual colors with a color picker.
-- Export and import palettes in JSON format.
-- Preview the first useful DEF frame and see palette changes immediately.
-- Browse every frame and group in the loaded DEF.
-- Select one or multiple palette colors and adjust hue, saturation, and lightness with live preview.
-- Build color sets automatically with Magic Recolor, similarity tolerance, target color, strength, and optional shade preservation.
-- Switch English/Czech UI language at runtime from external JSON language packs.
-- Use contextual tooltips and the built-in Help guide for editing and reset behavior.
+## Highlights
 
-## Usage
-1. Run `DEFRecolor.exe`.
-2. Use the menu to:
-   - **Load DEF**: Open a DEF file to edit its palette.
-   - **Save DEF**: Save the modified DEF file.
-   - **Export Palette**: Save the palette as a JSON file.
-   - **Import Palette**: Load a palette from a JSON file.
-3. Click on any color to modify it using the color picker.
+- Side-by-side original and recolored palettes.
+- Live comparison of the current frame and looping animation.
+- Separate group and frame navigation.
+- Multiple color selection with `Ctrl+click`.
+- Eyedropper selection directly from rendered DEF previews.
+- Selection by current frame, group, whole DEF, shared colors or unused colors.
+- Color-family, highlight, shadow and neutral selections from the **Select** menu.
+- Protected DEF transparency and shadow indices `0–7`.
+- Undo and redo for committed palette changes.
+- Local zoom and pan inside the preview workspace.
+- JSON palette import and export.
+- Drag-and-drop and command-line file opening.
+- Dynamically discovered external language packs.
 
-The left palette is the original reference; edit colors in the right palette.
+## Editing tools
 
-### Command line
+### Selection and masks
 
-Paths are Unicode-aware, including folders with accented or Cyrillic names.
+Pick colors in the edited palette, sample a visible DEF pixel with the eyedropper, or build a selection from palette usage and color ranges. Selected colors are outlined in the edited palette.
+
+### Corrections
+
+Adjust hue, saturation, lightness, contrast, gamma, exposure, vibrance, temperature and tint. Changes are shown live before they are committed.
+
+### Ramp and tone
+
+Map selected shades to a two- or three-color ramp while preserving luminance order. Tone modes include Color, Multiply, Screen and Overlay.
+
+### Magic Recolor
+
+Choose a representative palette color, expand the set with the Similarity slider, select a target color and control the resulting strength. Relative shade preservation keeps highlights and shadows coherent.
+
+### Advanced effects
+
+Apply grayscale, sepia, invert, posterize and automatic contrast to the selected editable colors.
+
+### Restore and reset
+
+Restore selected colors, restore the complete palette, cancel a live preview or reset only the active adjustment controls.
+
+## Installation
+
+DEFRecolor is portable and does not require an installer.
+
+1. Download the release ZIP.
+2. Extract the complete archive to one directory.
+3. Keep `DefThumbnailProvider.dll` next to `DEFRecolor.exe`.
+4. Run `DEFRecolor.exe` and open a `.def` file.
+
+The executable and `DefThumbnailProvider.dll` must use the same architecture. The DLL provides DEF decoding and rendering for the live previews and is based on [DefThumbnailProvider](https://github.com/GeorgeK1ng/DefThumbnailProvider).
+
+Release packages are provided for:
+
+- **x64** — standard 64-bit Windows systems.
+- **ARM64** — Windows on ARM devices.
+
+Each package is standalone: the matching provider DLL, languages and required license files are already included. The thumbnail provider does not need to be registered in Windows for DEFRecolor; keeping the DLL beside the executable is sufficient.
+
+Recommended release layout:
 
 ```text
-DEFRecolor /load input.def /import palette.json /save output.def
-DEFRecolor /load input.def /export palette.json
+DEFRecolor/
+├── DEFRecolor.exe
+├── DefThumbnailProvider.dll
+├── languages/
+│   ├── english.json
+│   ├── czech.json
+│   ├── german.json
+│   └── ...
+├── LICENSE
+└── README.md
 ```
 
-### Live preview
+## Quick start
 
-Live preview uses [DefThumbnailProvider](https://github.com/GeorgeK1ng/DefThumbnailProvider),
-so it renders DEF frames the same way as Windows Explorer. Install the thumbnail
-provider for the same architecture as DEFRecolor, or place `DefThumbnailProvider.dll`
-next to `DEFRecolor.exe`.
+1. Open a DEF with **File → Open DEF**, drag it onto the application, or drag it onto `DEFRecolor.exe`.
+2. Choose an animation group and frame in the top toolbar.
+3. Select one or more colors in the edited palette. Hold `Ctrl` to add or remove individual colors.
+4. Choose a tool category in the right inspector.
+5. Tune the controls while watching the original and recolored previews.
+6. Press the category's **Apply** button to create one undoable history step.
+7. Save the result. DEFRecolor proposes a filename based on the opened file.
 
-The frame browser and editor controls require a recent provider build exposing
-the `DefEditor*` API. Older provider DLLs continue to support the first-frame preview.
+The original palette and previews never change. The edited side always shows the result that will be saved.
 
-Initial view, left side is loaded static and right side is editable
+## Preview controls
 
-![image](https://github.com/user-attachments/assets/dc932ac8-5333-4fd2-a4fb-0b2b000f1d31)
+- Use the mouse wheel over the preview workspace to zoom.
+- Zoom is centered on the visible sprite rather than the transparent DEF canvas.
+- Use the local scrollbars to inspect an enlarged frame.
+- **100%** resets zoom and preview position.
+- Animation speed affects both looping animation previews.
+- Pause freezes the animations without changing the selected frame.
 
-Imported DEF
+## Keyboard shortcuts
 
-![image](https://github.com/user-attachments/assets/a676a27a-df26-479e-9533-cd80c80ee1cf)
+| Shortcut | Action |
+|---|---|
+| `Ctrl+O` | Open DEF |
+| `Ctrl+S` | Save DEF |
+| `Ctrl+I` | Import JSON palette |
+| `Ctrl+E` | Export JSON palette |
+| `Ctrl+Z` | Undo palette change |
+| `Ctrl+Y` | Redo palette change |
+| `Ctrl+1` … `Ctrl+6` | Switch tool category |
+| `F1` | Open the built-in guide |
 
-Color picker in right editable side
+## Command line
 
-![image](https://github.com/user-attachments/assets/2d009997-f1ef-4afc-ac00-798577f2fb91)
+Paths are Unicode-aware and may contain spaces or non-Latin characters.
 
-Recolored DEF using imported JSON palette
+```text
+DEFRecolor.exe "input.def"
+DEFRecolor.exe /load "input.def" /save "output.def"
+DEFRecolor.exe /load "input.def" /import "palette.json" /save "output.def"
+DEFRecolor.exe /load "input.def" /export "palette.json"
+```
 
-![image](https://github.com/user-attachments/assets/f37f8819-8802-4b09-9fd4-2757065ad76d)
+## Settings
 
-Palette in human readable form
+User preferences are stored in:
 
-![image](https://github.com/user-attachments/assets/aeb98c0d-edc5-4095-b3e7-26177a114c55)
+```text
+%APPDATA%\DEFRecolor\settings.json
+```
 
-Example of recolored Hero movement arrow
+The file contains recent DEF paths and the 16 custom colors used by Windows color dialogs. DEFRecolor no longer creates separate binary settings files.
 
-![image](https://github.com/user-attachments/assets/4e18de62-8f97-4e1d-ab3a-60fc887808c7)
+## Languages
+
+Included translations:
+
+- English
+- Czech
+- German
+- Polish
+- French
+- Russian
+- Ukrainian
+- Chinese
+
+Language files are discovered dynamically from the `languages` directory. To add a translation, copy `english.json`, translate its values without changing the keys, and restart DEFRecolor. The new language is added to the menu automatically.
+
+## Building from source
+
+Requirements:
+
+- Visual Studio 2019 or newer with **Desktop development with C++**.
+- Windows SDK.
+- CMake, used to build the bundled provider dependency.
+
+Clone the repository including its provider submodule:
+
+```text
+git clone --recurse-submodules https://github.com/GeorgeK1ng/DEFRecolor.git
+```
+
+For an existing checkout:
+
+```text
+git submodule update --init --recursive
+```
+
+Open `DEFRecolor.sln`, select `Release` and either `x64` or `ARM64`, then build the solution. MSBuild configures and builds `external/DefThumbnailProvider` automatically, copies the matching DLL beside DEFRecolor and copies all language packs. The application and provider use the statically linked MSVC runtime, so a separate Visual C++ Redistributable is not required by the release package.
+
+GitHub Actions uses the same solution build and publishes ready-to-run `x64` and `ARM64` ZIP artifacts. No separately downloaded provider is needed.
+
+## DefThumbnailProvider dependency
+
+[DefThumbnailProvider](https://github.com/GeorgeK1ng/DefThumbnailProvider) is included as a pinned git submodule under `external/DefThumbnailProvider`. DEFRecolor loads its editor API directly from the adjacent DLL for decoding, frame metadata and rendering. Keeping it as a submodule provides reproducible builds while allowing the provider to remain an independently maintained project.
+
+When updating the dependency, update the submodule commit deliberately and verify both architecture packages. Provider licensing material is copied into `licenses/DefThumbnailProvider` in every release archive.
+
+## Notes for DEF modding
+
+DEF palette indices `0–7` commonly have format-specific transparency and shadow roles. They are protected by default. Disable protection only when you deliberately need to edit those indices and understand how the target DEF type uses them.
+
+Palette edits affect the complete DEF because the format uses one shared palette. Frame and group controls change navigation and selection masks; they do not create separate per-frame palettes.
+
+## License
+
+DEFRecolor is distributed under the terms in [LICENSE](LICENSE).
+
+Issues and feature requests are welcome in the [GitHub issue tracker](https://github.com/GeorgeK1ng/DEFRecolor/issues).
 
 
-## Contributing
-Feel free to open an issue or submit a pull request to contribute to the project.

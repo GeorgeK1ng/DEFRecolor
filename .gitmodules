@@ -1,0 +1,3 @@
+[submodule "external/DefThumbnailProvider"]
+	path = external/DefThumbnailProvider
+	url = https://github.com/GeorgeK1ng/DefThumbnailProvider.git

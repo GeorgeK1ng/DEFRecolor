@@ -43,7 +43,6 @@
 *.dll
 
 # Local application data
-custom_colors.dat
 
 # Operating-system metadata
 .DS_Store
